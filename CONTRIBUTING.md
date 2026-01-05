@@ -20,13 +20,18 @@ so you can cooperate to create a better solution together.
 * If you are interested in starting with an easy issue, look for [issues with an `easyfix` label](https://github.com/ansible-collections/community.general/labels/easyfix).
 * Often issues that are waiting for contributors to pick up have [the `waiting_on_contributor` label](https://github.com/ansible-collections/community.general/labels/waiting_on_contributor).
 
-## Open pull requests
+## Review pull requests
 
 Look through currently [open pull requests](https://github.com/ansible-collections/community.general/pulls).
+
 You can help by reviewing them. Reviews help move pull requests to merge state. Some good pull requests cannot be merged only due to a lack of reviews. And it is always worth saying that good reviews are often more valuable than pull requests themselves.
-Note that reviewing does not only mean code review, but also offering comments on new interfaces added to existing plugins/modules, interfaces of new plugins/modules, improving language (not everyone is a native english speaker), or testing bugfixes and new features!
+Note that reviewing does not only mean code review, but also offering comments on new interfaces added to existing plugins/modules, interfaces of new plugins/modules, improving language (not everyone is a native English speaker), or testing bugfixes and new features!
 
 Also, consider taking up a valuable, reviewed, but abandoned pull request which you could politely ask the original authors to complete yourself.
+
+## Open pull requests
+
+Please read our ['Contributing to collections'](https://docs.ansible.com/projects/ansible/devel/dev_guide/developing_collections_contributing.html#contributing-to-a-collection-community-general) guide.
 
 * Try committing your changes with an informative but short commit message.
 * Do not squash your commits and force-push to your branch if not needed. Reviews of your pull request are much easier with individual commits to comprehend the pull request history. All commits of your pull request branch will be squashed into one commit by GitHub upon merge.
@@ -36,11 +41,11 @@ Also, consider taking up a valuable, reviewed, but abandoned pull request which 
   * Please always include a link to the pull request itself, and if the PR is about an issue, also a link to the issue. Also make sure the fragment ends with a period, and begins with a lower-case letter after `-`. (Again, if you don't do this, we'll add suggestions to fix it, so don't worry too much :) )
 * Note that we format the code with `ruff format`. If your change does not match the formatters expectations, CI will fail and your PR will not get merged. See below for how to format code with antsibull-nox.
 
-You can also read [our Quick-start development guide](https://github.com/ansible/community-docs/blob/main/create_pr_quick_start_guide.rst).
+You can also read the Ansible community's [Quick-start development guide](https://docs.ansible.com/projects/ansible/devel/community/create_pr_quick_start.html).
 
 ## Test pull requests
 
-If you want to test a PR locally, refer to [our testing guide](https://github.com/ansible/community-docs/blob/main/test_pr_locally_guide.rst) for instructions on how do it quickly.
+If you want to test a PR locally, refer to [our testing guide](https://docs.ansible.com/projects/ansible/devel/community/collection_contributors/collection_test_pr_locally.html) for instructions on how do it quickly.
 
 If you find any inconsistencies or places in this document which can be improved, feel free to raise an issue or pull request to fix it.
 
@@ -101,7 +106,7 @@ If you replace `-Re` with `-e`, then the virtual environments will be re-created
 Instead of using antsibull-nox, you can also run sanity and unit tests with ansible-test directly.
 This also allows you to run integration tests.
 
-You have to check out the repository into a specific path structure to be able to run `ansible-test`. The path to the git checkout must end with `.../ansible_collections/community/general`. Please see [our testing guide](https://github.com/ansible/community-docs/blob/main/test_pr_locally_guide.rst) for instructions on how to check out the repository into a correct path structure. The short version of these instructions is:
+You have to check out the repository into a specific path structure to be able to run `ansible-test`. The path to the git checkout must end with `.../ansible_collections/community/general`. Please see [our testing guide](https://docs.ansible.com/projects/ansible/devel/community/collection_contributors/collection_test_pr_locally.html) for instructions on how to check out the repository into a correct path structure. The short version of these instructions is:
 
 ```.bash
 mkdir -p ~/dev/ansible_collections/community
@@ -128,6 +133,7 @@ ansible-test sanity --docker -v plugins/modules/system/pids.py tests/integration
 Note that for running unit tests, you need to install required collections in the same folder structure that `community.general` is checked out in.
 Right now, you need to install [`community.internal_test_tools`](https://github.com/ansible-collections/community.internal_test_tools).
 If you want to use the latest version from GitHub, you can run:
+
 ```
 git clone https://github.com/ansible-collections/community.internal_test_tools.git ~/dev/ansible_collections/community/internal_test_tools
 ```
@@ -150,6 +156,7 @@ ansible-test units --docker -v --python 3.8 tests/unit/plugins/modules/net_tools
 Note that for running integration tests, you need to install required collections in the same folder structure that `community.general` is checked out in.
 Right now, depending on the test, you need to install [`ansible.posix`](https://github.com/ansible-collections/ansible.posix), [`community.crypto`](https://github.com/ansible-collections/community.crypto), and [`community.docker`](https://github.com/ansible-collections/community.docker):
 If you want to use the latest versions from GitHub, you can run:
+
 ```
 mkdir -p ~/dev/ansible_collections/ansible
 git clone https://github.com/ansible-collections/ansible.posix.git ~/dev/ansible_collections/ansible/posix
@@ -162,11 +169,13 @@ The following commands show how to run integration tests:
 #### In Docker
 
 Integration tests on Docker have the following parameters:
+
 - `image_name` (required): The name of the Docker image. To get the list of supported Docker images, run
   `ansible-test integration --help` and look for _target docker images_.
 - `test_name` (optional): The name of the integration test.
   For modules, this equals the short name of the module; for example, `pacman` in case of `community.general.pacman`.
   For plugins, the plugin type is added before the plugin's short name, for example `callback_yaml` for the `community.general.yaml` callback.
+
 ```.bash
 # Test all plugins/modules on fedora40
 ansible-test integration -v --docker fedora40
@@ -187,6 +196,31 @@ ansible-test integration -v lookup_flattened
 
 If you are unsure about the integration test target name for a module or plugin, you can take a look in `tests/integration/targets/`. Tests for plugins have the plugin type prepended.
 
+## Devcontainer
+
+Since community.general 12.2.0, the project repository supports [devcontainers](https://containers.dev/). In short, it is a standard mechanism to
+create a container that is then used during the development cycle. Many tools are pre-installed in the container and will be already available
+to you as a developer. A number of different IDEs support that configuration, the most prominent ones being VSCode and PyCharm.
+
+See the files under [.devcontainer](.devcontainer) for details on what is deployed inside that container.
+
+Beware of:
+
+- By default, the devcontainer installs the latest version of `ansible-core`.
+  When testing your changes locally, keep in mind that the collection must support older versions of
+  `ansible-core` and, depending on what is being tested, results may vary.
+- Integration tests executed directly inside the devcontainer without isolation (see above) may fail if
+  they expected to be run in full fledged VMs. On the other hand, the devcontainer setup allows running
+  containers inside the container (the `docker-in-docker` feature).
+- The devcontainer is built with a directory structure such that
+  `.../ansible_collections/community/general` contains the project repository, so `ansible-test` and
+  other standard tools should work without any additional setup
+- By default, the devcontainer installs `pre-commit` and configures it to perform `ruff check` and
+  `ruff format` on the Python files, prior to commiting. That configuration is going to be used by
+  `git` even outside the devcontainer. To prevent errors, you have to either install `pre-commit` in
+  your computer, outside the devcontainer, or run `pre-commit uninstall` from within the devcontainer
+  before quitting it.
+
 ## Creating new modules or plugins
 
 Creating new modules and plugins requires a bit more work than other Pull Requests.
@@ -196,7 +230,7 @@ Creating new modules and plugins requires a bit more work than other Pull Reques
 
 2. Please do not add more than one plugin/module in one PR, especially if it is the first plugin/module you are contributing.
    That makes it easier for reviewers, and increases the chance that your PR will get merged. If you plan to contribute a group
-   of plugins/modules (say, more than a module and a corresponding ``_info`` module), please mention that in the first PR. In
+   of plugins/modules (say, more than a module and a corresponding `_info` module), please mention that in the first PR. In
    such cases, you also have to think whether it is better to publish the group of plugins/modules in a new collection.
 
 3. When creating a new module or plugin, please make sure that you follow various guidelines:

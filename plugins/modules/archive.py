@@ -12,7 +12,7 @@ DOCUMENTATION = r"""
 module: archive
 short_description: Creates a compressed archive of one or more files or trees
 extends_documentation_fragment:
-  - files
+  - ansible.builtin.files
   - community.general.attributes
 description:
   - Creates or extends an archive.
@@ -321,7 +321,7 @@ class Archive(metaclass=abc.ABCMeta):
                 f_out.close()
                 self.successes.append(path)
                 self.destination_state = STATE_COMPRESSED
-            except (IOError, OSError) as e:
+            except OSError as e:
                 self.module.fail_json(
                     path=_to_native(path),
                     dest=_to_native(self.destination),
@@ -506,7 +506,7 @@ class ZipArchive(Archive):
     def _get_checksums(self, path):
         try:
             archive = zipfile.ZipFile(_to_native_ascii(path), "r")
-            checksums = set((info.filename, info.CRC) for info in archive.infolist())
+            checksums = {(info.filename, info.CRC) for info in archive.infolist()}
             archive.close()
         except BadZipFile:
             checksums = set()
@@ -558,11 +558,11 @@ class TarArchive(Archive):
             if self.format == "xz":
                 with lzma.open(_to_native_ascii(path), "r") as f:
                     archive = tarfile.open(fileobj=f)
-                    checksums = set((info.name, info.chksum) for info in archive.getmembers())
+                    checksums = {(info.name, info.chksum) for info in archive.getmembers()}
                     archive.close()
             else:
                 archive = tarfile.open(_to_native_ascii(path), f"r|{self.format}")
-                checksums = set((info.name, info.chksum) for info in archive.getmembers())
+                checksums = {(info.name, info.chksum) for info in archive.getmembers()}
                 archive.close()
         except (LZMAError, tarfile.ReadError, tarfile.CompressionError):
             try:
@@ -575,7 +575,7 @@ class TarArchive(Archive):
                     if not chunk:
                         break
                     checksum = crc32(chunk, checksum)
-                checksums = set([(b"", checksum)])
+                checksums = {(b"", checksum)}
                 f.close()
             except Exception:
                 checksums = set()
@@ -589,7 +589,7 @@ def get_archive(module):
         return TarArchive(module)
 
 
-def main():
+def create_module() -> AnsibleModule:
     module = AnsibleModule(
         argument_spec=dict(
             path=dict(type="list", elements="path", required=True),
@@ -603,6 +603,11 @@ def main():
         add_file_common_args=True,
         supports_check_mode=True,
     )
+    return module
+
+
+def main():
+    module = create_module()
 
     check_mode = module.check_mode
 

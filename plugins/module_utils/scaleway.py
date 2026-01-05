@@ -4,12 +4,14 @@
 
 from __future__ import annotations
 
+import os
 import json
 import re
 import sys
 import datetime
 import time
 import traceback
+import typing as t
 from urllib.parse import urlencode
 
 from ansible.module_utils.basic import env_fallback, missing_required_lib
@@ -18,6 +20,10 @@ from ansible.module_utils.urls import fetch_url
 from ansible_collections.community.general.plugins.module_utils.datetime import (
     now,
 )
+
+if t.TYPE_CHECKING:
+    from collections.abc import Iterable
+    from ansible.module_utils.basic import AnsibleModule
 
 SCALEWAY_SECRET_IMP_ERR: str | None = None
 try:
@@ -28,17 +34,28 @@ except Exception:
     SCALEWAY_SECRET_IMP_ERR = traceback.format_exc()
     HAS_SCALEWAY_SECRET_PACKAGE = False
 
+YAML_IMPORT_ERROR: str | None
+try:
+    import yaml
+except ImportError:
+    YAML_IMPORT_ERROR = traceback.format_exc()
+else:
+    YAML_IMPORT_ERROR = None
 
-def scaleway_argument_spec():
+
+def scaleway_argument_spec() -> dict[str, t.Any]:
     return dict(
         api_token=dict(
-            required=True,
             fallback=(env_fallback, ["SCW_TOKEN", "SCW_API_KEY", "SCW_OAUTH_TOKEN", "SCW_API_TOKEN"]),
             no_log=True,
             aliases=["oauth_token"],
         ),
         api_url=dict(
             fallback=(env_fallback, ["SCW_API_URL"]), default="https://api.scaleway.com", aliases=["base_url"]
+        ),
+        profile=dict(
+            fallback=(env_fallback, ["SCW_PROFILE"]),
+            aliases=["scw_profile"],
         ),
         api_timeout=dict(type="int", default=30, aliases=["timeout"]),
         query_parameters=dict(type="dict", default={}),
@@ -58,8 +75,24 @@ def payload_from_object(scw_object):
     return {k: v for k, v in scw_object.items() if k != "id" and v is not None}
 
 
+def get_scw_config_path(scw_profile: str) -> str | None:
+    if "SCW_CONFIG_PATH" in os.environ:
+        scw_config_path = os.getenv("SCW_CONFIG_PATH", "")
+    elif "XDG_CONFIG_HOME" in os.environ:
+        scw_config_path = os.path.join(os.getenv("XDG_CONFIG_HOME", ""), "scw", "config.yaml")
+    else:
+        scw_config_path = os.path.join(os.path.expanduser("~"), ".config", "scw", "config.yaml")
+
+    if os.path.exists(scw_config_path):
+        with open(scw_config_path) as fh:
+            scw_config = yaml.safe_load(fh)
+            return scw_config["profiles"][scw_profile].get("secret_key")
+
+    return None
+
+
 class ScalewayException(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         self.message = message
 
 
@@ -70,7 +103,7 @@ R_LINK_HEADER = r"""<[^>]+>;\srel="(first|previous|next|last)"
 R_RELATION = r'</?(?P<target_IRI>[^>]+)>; rel="(?P<relation>first|previous|next|last)"'
 
 
-def parse_pagination_link(header):
+def parse_pagination_link(header: str) -> dict[str, str]:
     if not re.match(R_LINK_HEADER, header, re.VERBOSE):
         raise ScalewayException("Scaleway API answered with an invalid Link pagination header")
     else:
@@ -86,7 +119,7 @@ def parse_pagination_link(header):
         return parsed_relations
 
 
-def filter_sensitive_attributes(container, attributes):
+def filter_sensitive_attributes(container: dict[str, t.Any], attributes: Iterable[str]) -> dict[str, t.Any]:
     """
     WARNING: This function is effectively private, **do not use it**!
     It will be removed or renamed once changing its name no longer triggers a pylint bug.
@@ -99,7 +132,7 @@ def filter_sensitive_attributes(container, attributes):
 
 class SecretVariables:
     @staticmethod
-    def ensure_scaleway_secret_package(module):
+    def ensure_scaleway_secret_package(module: AnsibleModule) -> None:
         if not HAS_SCALEWAY_SECRET_PACKAGE:
             module.fail_json(
                 msg=missing_required_lib("passlib[argon2]", url="https://passlib.readthedocs.io/en/stable/"),
@@ -169,10 +202,25 @@ class Response:
 
 
 class Scaleway:
-    def __init__(self, module):
+    def __init__(self, module: AnsibleModule) -> None:
         self.module = module
+        oauth_token = self.module.params.get("api_token")
+        scw_profile = self.module.params.get("profile")
+
+        if scw_profile:
+            if YAML_IMPORT_ERROR is not None:
+                self.module.fail_json(
+                    msg=missing_required_lib("PyYAML", reason="for scw_profile"), exception=YAML_IMPORT_ERROR
+                )
+            oauth_token = get_scw_config_path(scw_profile)
+
+        if oauth_token is None:
+            self.module.fail_json(
+                msg="Either your config profile could not be loaded or you have not provided an api_token."
+            )
+
         self.headers = {
-            "X-Auth-Token": self.module.params.get("api_token"),
+            "X-Auth-Token": oauth_token,
             "User-Agent": self.get_user_agent_string(module),
             "Content-Type": "application/json",
         }
@@ -224,8 +272,9 @@ class Scaleway:
         return Response(resp, info)
 
     @staticmethod
-    def get_user_agent_string(module):
-        return f"ansible {module.ansible_version} Python {sys.version.split(' ', 1)[0]}"
+    def get_user_agent_string(module: AnsibleModule) -> str:
+        ansible_version = module.ansible_version  # type: ignore # For some reason this isn't documented in AnsibleModule
+        return f"ansible {ansible_version} Python {sys.version.split(' ', 1)[0]}"
 
     def get(self, path, data=None, headers=None, params=None):
         return self.send(method="GET", path=path, data=data, headers=headers, params=params)
@@ -245,7 +294,7 @@ class Scaleway:
     def update(self, path, data=None, headers=None, params=None):
         return self.send(method="UPDATE", path=path, data=data, headers=headers, params=params)
 
-    def warn(self, x):
+    def warn(self, x) -> None:
         self.module.warn(str(x))
 
     def fetch_state(self, resource):

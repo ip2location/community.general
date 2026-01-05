@@ -102,10 +102,10 @@ error_messages = {
 }
 
 BITBUCKET_API_ENDPOINTS = {
-    "known-host-list": "%s/2.0/repositories/{workspace}/{repo_slug}/pipelines_config/ssh/known_hosts/"
-    % BitbucketHelper.BITBUCKET_API_URL,
-    "known-host-detail": "%s/2.0/repositories/{workspace}/{repo_slug}/pipelines_config/ssh/known_hosts/{known_host_uuid}"
-    % BitbucketHelper.BITBUCKET_API_URL,
+    "known-host-list": f"{BitbucketHelper.BITBUCKET_API_URL}/2.0/repositories/{{workspace}}/{{repo_slug}}/pipelines_config/ssh/known_hosts/",
+    "known-host-detail": (
+        f"{BitbucketHelper.BITBUCKET_API_URL}/2.0/repositories/{{workspace}}/{{repo_slug}}/pipelines_config/ssh/known_hosts/{{known_host_uuid}}"
+    ),
 }
 
 
@@ -181,7 +181,7 @@ def get_host_key(module, hostname):
     try:
         sock = socket.socket()
         sock.connect((hostname, 22))
-    except socket.error:
+    except OSError:
         module.fail_json(msg=f"Error opening socket to {hostname}")
 
     try:
